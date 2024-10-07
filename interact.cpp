@@ -13,7 +13,7 @@
 #include "binhash.hpp"
 
 /* Define this to use the bucketing version of the code */
-// /* #define USE_BUCKETING */
+#define USE_BUCKETING 
 
 /*@T
  * \subsection{Density computations}
@@ -62,7 +62,7 @@ void compute_density(sim_state_t* s, sim_param_t* params)
     /* BEGIN TASK */
     for (int i = 0; i < n; ++i) {
     particle_t* pi = &p[i];
-    pi->rho += (315.0 / 64.0 / M_PI) * mass / h3;
+    pi->rho += (315.0 / 64.0 / M_PI) * s->mass / h3;
 
     unsigned buckets[MAX_NBR_BINS];
     int num_buckets = particle_neighborhood(buckets, pi, h);
