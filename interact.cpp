@@ -54,12 +54,14 @@ void compute_density(sim_state_t* s, sim_param_t* params)
     float C  = ( 315.0/64.0/M_PI ) * s->mass / h9;
 
     // Clear densities
+    #pragma omp parallel for
     for (int i = 0; i < n; ++i)
         p[i].rho = 0;
 
     // Accumulate density info
 #ifdef USE_BUCKETING
     /* BEGIN TASK */
+    #pragma omp parallel for schedule(dynamic) // Add parallelization with dynamic scheduling
     for (int i = 0; i < n; ++i) {
     particle_t* pi = &p[i];
     pi->rho += (315.0 / 64.0 / M_PI) * s->mass / h3;
@@ -77,6 +79,7 @@ void compute_density(sim_state_t* s, sim_param_t* params)
 }
     /* END TASK */
 #else
+    #pragma omp parallel for schedule(dynamic)
     for (int i = 0; i < n; ++i) {
         particle_t* pi = s->part+i;
         pi->rho += ( 315.0/64.0/M_PI ) * s->mass / h3;
@@ -155,6 +158,7 @@ void compute_accel(sim_state_t* state, sim_param_t* params)
     compute_density(state, params);
 
     // Start with gravity and surface forces
+    #pragma omp parallel for
     for (int i = 0; i < n; ++i)
         vec3_set(p[i].a,  0, -g, 0);
 
@@ -165,6 +169,7 @@ void compute_accel(sim_state_t* state, sim_param_t* params)
 
     // Accumulate forces
     #ifdef USE_BUCKETING
+        #pragma omp parallel for schedule(dynamic) // Add parallelization with dynamic scheduling
         /* BEGIN TASK */
         for (int i = 0; i < n; ++i) {
         particle_t* pi = &p[i];
