@@ -164,33 +164,33 @@ void compute_accel(sim_state_t* state, sim_param_t* params)
     float Cv = -mu;
 
     // Accumulate forces
-#ifdef USE_BUCKETING
-    /* BEGIN TASK */
-    for (int i = 0; i < n; ++i) {
-    particle_t* pi = &p[i];
+    #ifdef USE_BUCKETING
+        /* BEGIN TASK */
+        for (int i = 0; i < n; ++i) {
+        particle_t* pi = &p[i];
 
-    unsigned buckets[MAX_NBR_BINS];
-    int num_buckets = particle_neighborhood(buckets, pi, h);
+        unsigned buckets[MAX_NBR_BINS];
+        int num_buckets = particle_neighborhood(buckets, pi, h);
 
-    for (int b = 0; b < num_buckets; ++b) {
-        particle_t* pj = hash[buckets[b]];
-        while (pj) {
-            if (pj != pi) { // Ensure not to calculate self-interaction
+        for (int b = 0; b < num_buckets; ++b) {
+            particle_t* pj = hash[buckets[b]];
+            while (pj) {
+                if (pj != pi) { // ensure not to calculate self-interaction
+                    update_forces(pi, pj, h2, rho0, C0, Cp, Cv);
+                }
+                pj = pj->next; // move to next particle in bucket
+            }
+        }
+    }
+        /* END TASK */
+    #else
+        for (int i = 0; i < n; ++i) {
+            particle_t* pi = p+i;
+            for (int j = i+1; j < n; ++j) {
+                particle_t* pj = p+j;
                 update_forces(pi, pj, h2, rho0, C0, Cp, Cv);
             }
-            pj = pj->next; // Move to the next particle in the bucket
         }
-    }
-}
-    /* END TASK */
-#else
-    for (int i = 0; i < n; ++i) {
-        particle_t* pi = p+i;
-        for (int j = i+1; j < n; ++j) {
-            particle_t* pj = p+j;
-            update_forces(pi, pj, h2, rho0, C0, Cp, Cv);
-        }
-    }
-#endif
+    #endif
 }
 

@@ -26,10 +26,6 @@ unsigned particle_bucket(particle_t* p, float h)
     unsigned iy = p->x[1]/h;
     unsigned iz = p->x[2]/h;
 
-    if (ix >= HASH_DIM || iy >= HASH_DIM || iz >= HASH_DIM) {
-        return -1; // bucket index is valid
-    }
-
     return zm_encode(ix & HASH_MASK, iy & HASH_MASK, iz & HASH_MASK);
 }
 
@@ -65,7 +61,8 @@ unsigned particle_neighborhood(unsigned* buckets, particle_t* p, float h)
     }
 
     // now we need to copy it over
-    memcpy(buckets, neighbour_buckets, sizeof(neighbour_buckets));
+    // memcpy(buckets, neighbour_buckets, sizeof(neighbour_buckets));
+    memcpy(buckets, neighbour_buckets, index * sizeof(unsigned));
     
     // tells how many were actually found
     return index; 
@@ -88,10 +85,6 @@ void hash_particles(sim_state_t* s, float h)
 
         // find the bucket it belongs to
         unsigned bucket = particle_bucket(particle, h);
-
-        if (bucket == (unsigned)-1) {
-            continue; // skip current particle if bucket index is invalid
-        }
 
         // update the pointers
         // #pragma omp critcal 
