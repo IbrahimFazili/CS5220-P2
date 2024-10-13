@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <assert.h>
+#include <omp.h>
 
 #include "vec3.hpp"
 #include "zmorton.hpp"
@@ -11,6 +12,7 @@
 #include "state.hpp"
 #include "interact.hpp"
 #include "binhash.hpp"
+#include "leapfrog.hpp"
 
 /* Define this to use the bucketing version of the code */
 #define USE_BUCKETING 
@@ -41,8 +43,7 @@
 //     }
 // }
 
-inline
-void update_density(particle_t* pi, particle_t* pj, float h2, float C, float* local_rho_i, float* local_rho_j)
+inline void update_density(particle_t* pi, particle_t* pj, float h2, float C, float* local_rho_i, float* local_rho_j)
 {
     float r2 = vec3_dist2(pi->x, pj->x);
     float z  = h2 - r2;
@@ -68,7 +69,7 @@ void compute_density(sim_state_t* s, sim_param_t* params)
     float C  = ( 315.0/64.0/M_PI ) * s->mass / h9;
 
     // Clear densities
-    #pragma omp parallel for
+    #pragma omp parallel for schedule(static)
     for (int i = 0; i < n; ++i)
         p[i].rho = 0;
 
@@ -92,7 +93,7 @@ void compute_density(sim_state_t* s, sim_param_t* params)
     // }
     #pragma omp parallel
     {
-        #pragma omp for
+        #pragma omp for schedule(dynamic)
         for (int i = 0; i < n; ++i) {
             particle_t* pi = &p[i];
             float local_rho_i = (315.0 / 64.0 / M_PI) * s->mass / h3; // Local contribution
@@ -114,7 +115,7 @@ void compute_density(sim_state_t* s, sim_param_t* params)
             }
 
             // Safely accumulate contributions
-            #pragma omp atomic
+            #pragma omp atomic update
             p[i].rho += local_rho_i; // Atomic update for particle i
 
             // If pj is updated in the same section, ensure that it's also safe
@@ -177,8 +178,7 @@ void compute_density(sim_state_t* s, sim_param_t* params)
 //     }
 // }
 
-inline
-void update_forces(particle_t* pi, particle_t* pj, float h2,
+inline void update_forces(particle_t* pi, particle_t* pj, float h2,
                    float rho0, float C0, float Cp, float Cv,
                    float* local_a_i, float* local_a_j)
 {
@@ -227,7 +227,7 @@ void compute_accel(sim_state_t* state, sim_param_t* params)
     compute_density(state, params);
 
     // Start with gravity and surface forces
-    // #pragma omp parallel for
+    #pragma omp parallel for
     for (int i = 0; i < n; ++i)
         vec3_set(p[i].a,  0, -g, 0);
 
@@ -255,7 +255,7 @@ void compute_accel(sim_state_t* state, sim_param_t* params)
         //         }
         //     }
         // }
-        #pragma omp parallel for
+        #pragma omp parallel for schedule(dynamic)
         for (int i = 0; i < n; ++i) {
             particle_t* pi = &p[i];
 
