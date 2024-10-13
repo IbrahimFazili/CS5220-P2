@@ -1,5 +1,5 @@
 # -- Compile settings for the cluster
 CPP       = CC
-CPPFLAGS  = -std=c++11 -Wall -g -fopenmp
+CPPFLAGS  = -std=c++11 -Wall -O3 -g -fopenmp -march=native -mtune=native -ffast-math -funroll-loops
 OPTFLAGS = -O3
 LIBS     = -lm

@@ -144,6 +144,7 @@ void check_state(sim_state_t* s)
 
 int main(int argc, char** argv)
 {
+    omp_set_num_threads(64);
     sim_param_t params;
     if (get_params(argc, argv, &params) != 0)
         exit(-1);

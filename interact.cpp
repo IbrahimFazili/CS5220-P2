@@ -4,6 +4,7 @@
 #include <math.h>
 #include <assert.h>
 #include <omp.h>
+#include <immintrin.h>
 
 #include "vec3.hpp"
 #include "zmorton.hpp"
@@ -93,7 +94,7 @@ void compute_density(sim_state_t* s, sim_param_t* params)
     // }
     #pragma omp parallel
     {
-        #pragma omp for schedule(dynamic)
+        #pragma omp for schedule(dynamic,64) nowait
         for (int i = 0; i < n; ++i) {
             particle_t* pi = &p[i];
             float local_rho_i = (315.0 / 64.0 / M_PI) * s->mass / h3; // Local contribution
@@ -255,7 +256,9 @@ void compute_accel(sim_state_t* state, sim_param_t* params)
         //         }
         //     }
         // }
-        #pragma omp parallel for schedule(dynamic)
+        #pragma omp parallel 
+        {
+        #pragma omp for schedule(dynamic,64) nowait
         for (int i = 0; i < n; ++i) {
             particle_t* pi = &p[i];
 
@@ -280,6 +283,7 @@ void compute_accel(sim_state_t* state, sim_param_t* params)
             for (int d = 0; d < 3; ++d) {
                 pi->a[d] += local_a_i[d]; // thread safety
             }
+        }
         }
     #else
         for (int i = 0; i < n; ++i) {
