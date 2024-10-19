@@ -12,6 +12,8 @@
 #include "interact.hpp"
 #include "binhash.hpp"
 
+#include <immintrin.h>
+
 /* Define this to use the bucketing version of the code */
 #define USE_BUCKETING 
 
@@ -29,17 +31,31 @@
  * way that $j$ contributes to $i$).
  *@c*/
 
+// inline
+// void update_density(particle_t* pi, particle_t* pj, float h2, float C)
+// {
+//     float r2 = vec3_dist2(pi->x, pj->x);
+//     float z  = h2-r2;
+//     if (z > 0) {
+//         float rho_ij = C*z*z*z;
+//         pi->rho += rho_ij;
+//         pj->rho += rho_ij;
+//     }
+// }
+
 inline
-void update_density(particle_t* pi, particle_t* pj, float h2, float C)
+void update_density(float * pi, particle_t* pj, float h2, float C, float* local_rho_i, float* local_rho_j)
 {
-    float r2 = vec3_dist2(pi->x, pj->x);
-    float z  = h2-r2;
+    float r2 = vec3_dist2(pi, pj->x);
+    float z  = h2 - r2;
     if (z > 0) {
-        float rho_ij = C*z*z*z;
-        pi->rho += rho_ij;
-        pj->rho += rho_ij;
+        float rho_ij = C * z * z * z;
+        // accumulate local density contribs
+        *local_rho_i += rho_ij;
+        *local_rho_j += rho_ij; 
     }
 }
+
 
 void compute_density(sim_state_t* s, sim_param_t* params)
 {
@@ -54,28 +70,62 @@ void compute_density(sim_state_t* s, sim_param_t* params)
     float C  = ( 315.0/64.0/M_PI ) * s->mass / h9;
 
     // Clear densities
+    #pragma omp parallel for
     for (int i = 0; i < n; ++i)
         p[i].rho = 0;
 
     // Accumulate density info
 #ifdef USE_BUCKETING
-    /* BEGIN TASK */
+    // for (int i = 0; i < n; ++i) {
+    //     particle_t* pi = &p[i];
+
+    //     pi->rho += (315.0 / 64.0 / M_PI) * s->mass / h3;
+
+    //     unsigned buckets[MAX_NBR_BINS];
+    //     int num_buckets = particle_neighborhood(buckets, pi, h);
+
+    //     for (int b = 0; b < num_buckets; ++b) {
+    //         particle_t* pj = hash[buckets[b]];
+    //         while (pj) {
+    //             update_density(pi, pj, h2, C);
+    //             pj = pj->next; // mv to next particle in bucket
+    //         }
+    //     }
+    // }
+#pragma omp parallel
+{
+    // Use thread-private variables to avoid conflicts
+    float local_rho_i = 0.0f; // Local contribution for particle i
+
+    #pragma omp for schedule(dynamic,64) nowait
     for (int i = 0; i < n; ++i) {
-    particle_t* pi = &p[i];
-    pi->rho += (315.0 / 64.0 / M_PI) * s->mass / h3;
+        particle_t* pi = &p[i];
+        local_rho_i = (315.0 / 64.0 / M_PI) * s->mass / h3; // Initialize local contribution
 
-    unsigned buckets[MAX_NBR_BINS];
-    int num_buckets = particle_neighborhood(buckets, pi, h);
+        // Store the positions in registers for faster access
+        register float* pi_x = pi->x;
 
-    for (int b = 0; b < num_buckets; ++b) {
-        particle_t* pj = hash[buckets[b]];
-        while (pj) {
-            update_density(pi, pj, h2, C);
-            pj = pj->next; // mv to next particle in bucket
+        unsigned buckets[MAX_NBR_BINS];
+        int num_buckets = particle_neighborhood(buckets, pi, h);
+
+        for (int b = 0; b < num_buckets; ++b) {
+            particle_t* pj = hash[buckets[b]];
+            float local_rho_j = 0.0f; // Local contribution for pj
+
+            while (pj) {
+                // Update density using the inline distance
+                update_density(pi_x, pj, h2, C, &local_rho_i, &local_rho_j);
+                pj = pj->next; // Move to next particle in bucket
+            }
+
         }
+
+        // Use atomic to accumulate contributions safely, avoid performance bottlenecks from `critical`
+        #pragma omp atomic
+        p[i].rho += local_rho_i; // Update particle i's density
     }
 }
-    /* END TASK */
+
 #else
     for (int i = 0; i < n; ++i) {
         particle_t* pi = s->part+i;
@@ -104,9 +154,38 @@ void compute_density(sim_state_t* s, sim_param_t* params)
  * but it does a very expensive brute force search for neighbors.
  *@c*/
 
+// inline
+// void update_forces(particle_t* pi, particle_t* pj, float h2,
+//                    float rho0, float C0, float Cp, float Cv)
+// {
+//     float dx[3];
+//     vec3_diff(dx, pi->x, pj->x);
+//     float r2 = vec3_len2(dx);
+//     if (r2 < h2) {
+//         const float rhoi = pi->rho;
+//         const float rhoj = pj->rho;
+//         float q = sqrt(r2/h2);
+//         float u = 1-q;
+//         float w0 = C0 * u/rhoi/rhoj;
+//         float wp = w0 * Cp * (rhoi+rhoj-2*rho0) * u/q;
+//         float wv = w0 * Cv;
+//         float dv[3];
+//         vec3_diff(dv, pi->v, pj->v);
+
+//         // Equal and opposite pressure forces
+//         vec3_saxpy(pi->a,  wp, dx);
+//         vec3_saxpy(pj->a, -wp, dx);
+        
+//         // Equal and opposite viscosity forces
+//         vec3_saxpy(pi->a,  wv, dv);
+//         vec3_saxpy(pj->a, -wv, dv);        
+//     }
+// }
+
 inline
 void update_forces(particle_t* pi, particle_t* pj, float h2,
-                   float rho0, float C0, float Cp, float Cv)
+                   float rho0, float C0, float Cp, float Cv,
+                   float* local_a_i, float* local_a_j)
 {
     float dx[3];
     vec3_diff(dx, pi->x, pj->x);
@@ -114,21 +193,19 @@ void update_forces(particle_t* pi, particle_t* pj, float h2,
     if (r2 < h2) {
         const float rhoi = pi->rho;
         const float rhoj = pj->rho;
-        float q = sqrt(r2/h2);
-        float u = 1-q;
-        float w0 = C0 * u/rhoi/rhoj;
-        float wp = w0 * Cp * (rhoi+rhoj-2*rho0) * u/q;
+        float q = sqrt(r2 / h2);
+        float u = 1 - q;
+        float w0 = C0 * u / rhoi / rhoj;
+        float wp = w0 * Cp * (rhoi + rhoj - 2 * rho0) * u / q;
         float wv = w0 * Cv;
         float dv[3];
         vec3_diff(dv, pi->v, pj->v);
 
-        // Equal and opposite pressure forces
-        vec3_saxpy(pi->a,  wp, dx);
-        vec3_saxpy(pj->a, -wp, dx);
-        
-        // Equal and opposite viscosity forces
-        vec3_saxpy(pi->a,  wv, dv);
-        vec3_saxpy(pj->a, -wv, dv);
+        // Accumulate local forces
+        vec3_saxpy(local_a_i, wp, dx);
+        vec3_saxpy(local_a_j, -wp, dx);
+        vec3_saxpy(local_a_i, wv, dv);
+        vec3_saxpy(local_a_j, -wv, dv);
     }
 }
 
@@ -155,6 +232,7 @@ void compute_accel(sim_state_t* state, sim_param_t* params)
     compute_density(state, params);
 
     // Start with gravity and surface forces
+    // #pragma omp parallel for
     for (int i = 0; i < n; ++i)
         vec3_set(p[i].a,  0, -g, 0);
 
@@ -165,24 +243,52 @@ void compute_accel(sim_state_t* state, sim_param_t* params)
 
     // Accumulate forces
     #ifdef USE_BUCKETING
-        /* BEGIN TASK */
-        for (int i = 0; i < n; ++i) {
-        particle_t* pi = &p[i];
+        // #pragma omp parallel for schedule(dynamic) 
+        // for (int i = 0; i < n; ++i) {
+        //     particle_t* pi = &p[i];
 
-        unsigned buckets[MAX_NBR_BINS];
-        int num_buckets = particle_neighborhood(buckets, pi, h);
+        //     unsigned buckets[MAX_NBR_BINS];
+        //     int num_buckets = particle_neighborhood(buckets, pi, h);
 
-        for (int b = 0; b < num_buckets; ++b) {
-            particle_t* pj = hash[buckets[b]];
-            while (pj) {
-                if (pj != pi) { // ensure not to calculate self-interaction
-                    update_forces(pi, pj, h2, rho0, C0, Cp, Cv);
+        //     for (int b = 0; b < num_buckets; ++b) {
+        //         particle_t* pj = hash[buckets[b]];
+        //         while (pj) {
+        //             if (pj != pi) { // ensure not to calculate self-interaction
+        //                 update_forces(pi, pj, h2, rho0, C0, Cp, Cv);
+        //             }
+        //             pj = pj->next; // move to next particle in bucket
+        //         }
+        //     }
+        // }
+        #pragma omp parallel 
+        {
+            #pragma omp for schedule(dynamic,64) nowait
+            for (int i = 0; i < n; ++i) {
+                particle_t* pi = &p[i];
+
+                unsigned buckets[MAX_NBR_BINS];
+                int num_buckets = particle_neighborhood(buckets, pi, h);
+
+                float local_a_i[3] = {0, 0, 0}; // local acceleration for pi
+
+                for (int b = 0; b < num_buckets; ++b) {
+                    particle_t* pj = hash[buckets[b]];
+                    float local_a_j[3] = {0, 0, 0}; // local acceleration for pj
+
+                    while (pj) {
+                        if (pj != pi) {
+                            update_forces(pi, pj, h2, rho0, C0, Cp, Cv, local_a_i, local_a_j);
+                        }
+                        pj = pj->next; // mv to next particle in bucket
+                    }
                 }
-                pj = pj->next; // move to next particle in bucket
+
+                // update global accel
+                for (int d = 0; d < 3; ++d) {
+                    pi->a[d] += local_a_i[d]; // thread safety
+                }
             }
         }
-    }
-        /* END TASK */
     #else
         for (int i = 0; i < n; ++i) {
             particle_t* pi = p+i;

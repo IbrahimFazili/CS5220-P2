@@ -37,9 +37,9 @@ inline void vec3_scale(float* result, float alpha, float* v)
 
 inline float vec3_dist2(float* a, float* b)
 {
-    float dx = a[0]-b[0];
-    float dy = a[1]-b[1];
-    float dz = a[2]-b[2];
+    register float dx = a[0]-b[0];
+    register float dy = a[1]-b[1];
+    register float dz = a[2]-b[2];
     return dx*dx + dy*dy + dz*dz;
 }
 
@@ -50,9 +50,9 @@ inline float vec3_len2(float* a)
 
 inline void vec3_saxpy(float* result, float alpha, float* v)
 {
-    result[0] += alpha*v[0];
-    result[1] += alpha*v[1];
-    result[2] += alpha*v[2];
+        result[0] += alpha*v[0];
+        result[1] += alpha*v[1];
+        result[2] += alpha*v[2];
 }
 
 inline void vec3_scalev(float* result, float alpha)

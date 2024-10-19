@@ -42,7 +42,6 @@ unsigned particle_neighborhood(unsigned* buckets, particle_t* p, float h)
     int index = 0;
 
     // @NOTE: can we parallelize this?
-    // #pragma omp parallel for collapse(3) shared(neighbor_buckets) private(index)
     for (int dx = -1; dx <= 1; ++dx) {
         for (int dy = -1; dy <= 1; ++dy) {
             for (int dz = -1; dz <= 1; ++dz) {
@@ -51,17 +50,14 @@ unsigned particle_neighborhood(unsigned* buckets, particle_t* p, float h)
                 unsigned new_py = py + dy;
                 unsigned new_pz = pz + dz;
 
-                // #pragma omp critical {
-                    int bucket_hash = zm_encode(new_px & HASH_MASK, new_py & HASH_MASK, new_pz & HASH_MASK);
-                    neighbour_buckets[index] = bucket_hash;
-                    index++;
-                // }
+                int bucket_hash = zm_encode(new_px & HASH_MASK, new_py & HASH_MASK, new_pz & HASH_MASK);
+                neighbour_buckets[index] = bucket_hash;
+                index++;
             }
         }
     }
 
     // now we need to copy it over
-    // memcpy(buckets, neighbour_buckets, sizeof(neighbour_buckets));
     memcpy(buckets, neighbour_buckets, index * sizeof(unsigned));
     
     // tells how many were actually found
