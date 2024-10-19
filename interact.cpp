@@ -67,7 +67,7 @@ void compute_density(sim_state_t* s, sim_param_t* params)
     float h9 = h3*h3*h3;
     float C  = ( 315.0/64.0/M_PI ) * s->mass / h9;
 
-    // Clear densities
+    // clear densities
     #pragma omp parallel for
     for (int i = 0; i < n; ++i)
         p[i].rho = 0;
@@ -90,36 +90,31 @@ void compute_density(sim_state_t* s, sim_param_t* params)
     //         }
     //     }
     // }
-    #pragma omp parallel
-    {
-        #pragma omp for
-        for (int i = 0; i < n; ++i) {
-            particle_t* pi = &p[i];
-            float local_rho_i = (315.0 / 64.0 / M_PI) * s->mass / h3; // Local contribution
 
-            unsigned buckets[MAX_NBR_BINS];
-            int num_buckets = particle_neighborhood(buckets, pi, h);
+    #pragma omp parallel for schedule(dynamic)
+    for (int i = 0; i < n; ++i) {
+        particle_t* pi = &p[i];
+        float local_rho_i = (315.0 / 64.0 / M_PI) * s->mass / h3; // local contribution
 
-            for (int b = 0; b < num_buckets; ++b) {
-                particle_t* pj = hash[buckets[b]];
-                float local_rho_j = 0; // Local contribution for pj
+        unsigned buckets[MAX_NBR_BINS];
+        int num_buckets = particle_neighborhood(buckets, pi, h);
 
-                while (pj) {
-                    update_density(pi, pj, h2, C, &local_rho_i, &local_rho_j);
-                    pj = pj->next; // Move to next particle in bucket
-                }
-                
-                // Update local density for pj if needed
-                local_rho_j += local_rho_j; 
+        for (int b = 0; b < num_buckets; ++b) {
+            particle_t* pj = hash[buckets[b]];
+            float local_rho_j = 0; // local contribution for pj
+
+            while (pj) {
+                update_density(pi, pj, h2, C, &local_rho_i, &local_rho_j);
+                pj = pj->next; // mv to next particle in bucket
             }
-
-            // Safely accumulate contributions
-            #pragma omp atomic
-            p[i].rho += local_rho_i; // Atomic update for particle i
-
-            // If pj is updated in the same section, ensure that it's also safe
-            // Note: If pj is the same as pi, handle carefully
+            
+            // update local density for pj if needed
+            local_rho_j += local_rho_j; 
         }
+
+        // accumulate contributions
+        #pragma omp atomic
+        p[i].rho += local_rho_i; // atomic update for particle i
     }
 #else
     for (int i = 0; i < n; ++i) {
@@ -227,7 +222,7 @@ void compute_accel(sim_state_t* state, sim_param_t* params)
     compute_density(state, params);
 
     // Start with gravity and surface forces
-    // #pragma omp parallel for
+    #pragma omp parallel for 
     for (int i = 0; i < n; ++i)
         vec3_set(p[i].a,  0, -g, 0);
 
@@ -255,7 +250,8 @@ void compute_accel(sim_state_t* state, sim_param_t* params)
         //         }
         //     }
         // }
-        #pragma omp parallel for
+
+        #pragma omp parallel for 
         for (int i = 0; i < n; ++i) {
             particle_t* pi = &p[i];
 
@@ -277,6 +273,7 @@ void compute_accel(sim_state_t* state, sim_param_t* params)
             }
 
             // update global accel
+            #pragma omp parallel for
             for (int d = 0; d < 3; ++d) {
                 pi->a[d] += local_a_i[d]; // thread safety
             }

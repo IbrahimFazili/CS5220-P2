@@ -73,9 +73,6 @@ void hash_particles(sim_state_t* s, float h)
     memset(s->hash, 0, HASH_SIZE * sizeof(particle_t*));
 
     // assign each particle to a bucket
-    // my attempt at parallelizing it
-
-    // #pragma omp parallel for
     for (int i = 0; i < s->n; ++i) {
         particle_t* particle = &s->part[i];
 
@@ -83,11 +80,8 @@ void hash_particles(sim_state_t* s, float h)
         unsigned bucket = particle_bucket(particle, h);
 
         // update the pointers
-        // #pragma omp critcal 
-        // {
-            particle->next = s->hash[bucket];
-            s->hash[bucket] = particle;
-        // }
+        particle->next = s->hash[bucket];
+        s->hash[bucket] = particle;
     }
     /* END TASK */
 }

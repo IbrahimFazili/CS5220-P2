@@ -50,9 +50,9 @@ inline float vec3_len2(float* a)
 
 inline void vec3_saxpy(float* result, float alpha, float* v)
 {
-        result[0] += alpha*v[0];
-        result[1] += alpha*v[1];
-        result[2] += alpha*v[2];
+    result[0] += alpha*v[0];
+    result[1] += alpha*v[1];
+    result[2] += alpha*v[2];
 }
 
 inline void vec3_scalev(float* result, float alpha)
