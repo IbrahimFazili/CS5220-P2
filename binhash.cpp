@@ -17,7 +17,6 @@
  * modulus or something of that sort.
  * 
  *@c*/
-
 #define HASH_MASK (HASH_DIM-1)
 
 unsigned particle_bucket(particle_t* p, float h)
@@ -41,11 +40,10 @@ unsigned particle_neighborhood(unsigned* buckets, particle_t* p, float h)
     unsigned neighbour_buckets[27]; // if we stick to using h as is
     int index = 0;
 
-    // @NOTE: can we parallelize this?
     for (int dx = -1; dx <= 1; ++dx) {
         for (int dy = -1; dy <= 1; ++dy) {
             for (int dz = -1; dz <= 1; ++dz) {
-                // find for any possible direction the bin could have a neighbour in
+                // for any possible direction, find the bin could have a neighbour in
                 unsigned new_px = px + dx;
                 unsigned new_py = py + dy;
                 unsigned new_pz = pz + dz;
@@ -69,25 +67,18 @@ void hash_particles(sim_state_t* s, float h)
 {
     /* BEGIN TASK */
 
-    // initialize the table to NULL
+    // init table to null
     memset(s->hash, 0, HASH_SIZE * sizeof(particle_t*));
 
     // assign each particle to a bucket
-    // my attempt at parallelizing it
-
-    // #pragma omp parallel for
     for (int i = 0; i < s->n; ++i) {
         particle_t* particle = &s->part[i];
 
         // find the bucket it belongs to
         unsigned bucket = particle_bucket(particle, h);
 
-        // update the pointers
-        // #pragma omp critcal 
-        // {
-            particle->next = s->hash[bucket];
-            s->hash[bucket] = particle;
-        // }
+        particle->next = s->hash[bucket];
+        s->hash[bucket] = particle;
     }
     /* END TASK */
 }

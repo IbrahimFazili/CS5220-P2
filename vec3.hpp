@@ -8,7 +8,6 @@
  * of code repeatedly.
  *
  *@c*/
-
 inline void vec3_set(float* result, float x, float y, float z)
 {
     result[0] = x;
