@@ -37,9 +37,9 @@ inline void vec3_scale(float* result, float alpha, float* v)
 
 inline float vec3_dist2(float* a, float* b)
 {
-    float dx = a[0]-b[0];
-    float dy = a[1]-b[1];
-    float dz = a[2]-b[2];
+    register float dx = a[0]-b[0];
+    register float dy = a[1]-b[1];
+    register float dz = a[2]-b[2];
     return dx*dx + dy*dy + dz*dz;
 }
 

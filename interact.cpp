@@ -12,6 +12,8 @@
 #include "interact.hpp"
 #include "binhash.hpp"
 
+#include <immintrin.h>
+
 /* Define this to use the bucketing version of the code */
 #define USE_BUCKETING 
 
@@ -42,9 +44,9 @@
 // }
 
 inline
-void update_density(particle_t* pi, particle_t* pj, float h2, float C, float* local_rho_i, float* local_rho_j)
+void update_density(float * pi, particle_t* pj, float h2, float C, float* local_rho_i, float* local_rho_j)
 {
-    float r2 = vec3_dist2(pi->x, pj->x);
+    float r2 = vec3_dist2(pi, pj->x);
     float z  = h2 - r2;
     if (z > 0) {
         float rho_ij = C * z * z * z;
@@ -90,37 +92,40 @@ void compute_density(sim_state_t* s, sim_param_t* params)
     //         }
     //     }
     // }
-    #pragma omp parallel
-    {
-        #pragma omp for
-        for (int i = 0; i < n; ++i) {
-            particle_t* pi = &p[i];
-            float local_rho_i = (315.0 / 64.0 / M_PI) * s->mass / h3; // Local contribution
+#pragma omp parallel
+{
+    // Use thread-private variables to avoid conflicts
+    float local_rho_i = 0.0f; // Local contribution for particle i
 
-            unsigned buckets[MAX_NBR_BINS];
-            int num_buckets = particle_neighborhood(buckets, pi, h);
+    #pragma omp for schedule(dynamic,64) nowait
+    for (int i = 0; i < n; ++i) {
+        particle_t* pi = &p[i];
+        local_rho_i = (315.0 / 64.0 / M_PI) * s->mass / h3; // Initialize local contribution
 
-            for (int b = 0; b < num_buckets; ++b) {
-                particle_t* pj = hash[buckets[b]];
-                float local_rho_j = 0; // Local contribution for pj
+        // Store the positions in registers for faster access
+        register float* pi_x = pi->x;
 
-                while (pj) {
-                    update_density(pi, pj, h2, C, &local_rho_i, &local_rho_j);
-                    pj = pj->next; // Move to next particle in bucket
-                }
-                
-                // Update local density for pj if needed
-                local_rho_j += local_rho_j; 
+        unsigned buckets[MAX_NBR_BINS];
+        int num_buckets = particle_neighborhood(buckets, pi, h);
+
+        for (int b = 0; b < num_buckets; ++b) {
+            particle_t* pj = hash[buckets[b]];
+            float local_rho_j = 0.0f; // Local contribution for pj
+
+            while (pj) {
+                // Update density using the inline distance
+                update_density(pi_x, pj, h2, C, &local_rho_i, &local_rho_j);
+                pj = pj->next; // Move to next particle in bucket
             }
 
-            // Safely accumulate contributions
-            #pragma omp atomic
-            p[i].rho += local_rho_i; // Atomic update for particle i
-
-            // If pj is updated in the same section, ensure that it's also safe
-            // Note: If pj is the same as pi, handle carefully
         }
+
+        // Use atomic to accumulate contributions safely, avoid performance bottlenecks from `critical`
+        #pragma omp atomic
+        p[i].rho += local_rho_i; // Update particle i's density
     }
+}
+
 #else
     for (int i = 0; i < n; ++i) {
         particle_t* pi = s->part+i;
@@ -255,30 +260,33 @@ void compute_accel(sim_state_t* state, sim_param_t* params)
         //         }
         //     }
         // }
-        #pragma omp parallel for
-        for (int i = 0; i < n; ++i) {
-            particle_t* pi = &p[i];
+        #pragma omp parallel 
+        {
+            #pragma omp for schedule(dynamic,64) nowait
+            for (int i = 0; i < n; ++i) {
+                particle_t* pi = &p[i];
 
-            unsigned buckets[MAX_NBR_BINS];
-            int num_buckets = particle_neighborhood(buckets, pi, h);
+                unsigned buckets[MAX_NBR_BINS];
+                int num_buckets = particle_neighborhood(buckets, pi, h);
 
-            float local_a_i[3] = {0, 0, 0}; // local acceleration for pi
+                float local_a_i[3] = {0, 0, 0}; // local acceleration for pi
 
-            for (int b = 0; b < num_buckets; ++b) {
-                particle_t* pj = hash[buckets[b]];
-                float local_a_j[3] = {0, 0, 0}; // local acceleration for pj
+                for (int b = 0; b < num_buckets; ++b) {
+                    particle_t* pj = hash[buckets[b]];
+                    float local_a_j[3] = {0, 0, 0}; // local acceleration for pj
 
-                while (pj) {
-                    if (pj != pi) {
-                        update_forces(pi, pj, h2, rho0, C0, Cp, Cv, local_a_i, local_a_j);
+                    while (pj) {
+                        if (pj != pi) {
+                            update_forces(pi, pj, h2, rho0, C0, Cp, Cv, local_a_i, local_a_j);
+                        }
+                        pj = pj->next; // mv to next particle in bucket
                     }
-                    pj = pj->next; // mv to next particle in bucket
                 }
-            }
 
-            // update global accel
-            for (int d = 0; d < 3; ++d) {
-                pi->a[d] += local_a_i[d]; // thread safety
+                // update global accel
+                for (int d = 0; d < 3; ++d) {
+                    pi->a[d] += local_a_i[d]; // thread safety
+                }
             }
         }
     #else
