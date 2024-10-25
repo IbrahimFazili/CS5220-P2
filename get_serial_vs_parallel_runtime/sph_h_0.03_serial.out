@@ -1,0 +1,8 @@
+g++  -std=c++11 -Wall -O3 -g -fopenmp -march=native -mtune=native -ffast-math -funroll-loops  -c -o sph.o sph.cpp
+g++  -std=c++11 -Wall -O3 -g -fopenmp -march=native -mtune=native -ffast-math -funroll-loops  -c -o params.o params.cpp
+g++  -std=c++11 -Wall -O3 -g -fopenmp -march=native -mtune=native -ffast-math -funroll-loops  -c -o state.o state.cpp
+g++  -std=c++11 -Wall -O3 -g -fopenmp -march=native -mtune=native -ffast-math -funroll-loops  -c -o binhash.o binhash.cpp
+g++  -std=c++11 -Wall -O3 -g -fopenmp -march=native -mtune=native -ffast-math -funroll-loops  -c -o interact.o interact.cpp
+g++  -std=c++11 -Wall -O3 -g -fopenmp -march=native -mtune=native -ffast-math -funroll-loops  -c -o leapfrog.o leapfrog.cpp
+g++  -std=c++11 -Wall -O3 -g -fopenmp -march=native -mtune=native -ffast-math -funroll-loops  -c -o io_txt.o io_txt.cpp
+CC -std=c++11 -Wall -O3 -g -fopenmp -march=native -mtune=native -ffast-math -funroll-loops sph.o params.o state.o binhash.o interact.o leapfrog.o io_txt.o -o sph.x -lm

@@ -1,0 +1,37 @@
+Hierarchy Level	Metric Name	Metric Value
+0	Elapsed Time	56.642367
+1	Paused Time	0.0
+0	Effective CPU Utilization	0.0% (0.010 out of 256 logical CPUs)
+1	OpenMP Analysis. Collection Time	56.642367
+2	Serial Time (outside parallel regions)	44.835s (79.2%)
+3	Top Serial Hotspots (outside parallel regions)	
+3	Function	Module	Serial CPU Time
+1	Total Thread Count	70
+2	Thread Oversubscription	0s (0.0% of CPU Time)
+1	Wait Time with poor CPU Utilization	158.966s (100.0% of Wait Time)
+2	Top Waiting Objects	
+2	Sync Object	Wait Time with poor CPU Utilization	(% from Object Wait Time)(%)	Wait Count
+2	poll	81.938401	100.0	21
+2	Signal	25.648963	100.0	1
+2	Socket 0xc651ece5	25.641137	100.0	2
+2	Condition Variable 0x08fe7c16	25.572055	100.0	2
+2	Stream 0x85af4961	0.105266	100.0	400
+2	[Others]	0.060243	100.0	316
+1	Spin and Overhead Time	0s (0.0% of CPU Time)
+2	Top Functions with Spin or Overhead Time	
+2	Function	Module	Spin and Overhead Time	(% from CPU Time)(%)
+0	Collection and Platform Info	
+1	Application Command Line	srun "./sph.x" 
+1	Operating System	5.14.21-150400.24.111_12.0.91-cray_shasta_c NAME="SLES" VERSION="15-SP4" VERSION_ID="15.4" PRETTY_NAME="SUSE Linux Enterprise Server 15 SP4" ID="sles" ID_LIKE="suse" ANSI_COLOR="0;32" CPE_NAME="cpe:/o:suse:sles:15:sp4" DOCUMENTATION_URL="https://documentation.suse.com/"
+1	Computer Name	nid004943
+1	Result Size	90632822
+1	Collection start time	22:14:01 24/10/2024 UTC
+1	Collection stop time	22:14:58 24/10/2024 UTC
+1	Collector Type	User-mode sampling and tracing
+1	CPU	
+2	Name	Unknown
+2	Frequency	2445405930
+2	Logical CPU Count	256
+2	Cache Allocation Technology	
+3	Level 2 capability	not detected
+3	Level 3 capability	available

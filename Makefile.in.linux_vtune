@@ -1,0 +1,5 @@
+# -- Compile settings for the cluster
+CPP       = icpc  # Intel C++ compiler
+CPPFLAGS  = -std=c++11 -Wall -O3 -g -fopenmp -march=native -mtune=native -ffast-math -funroll-loops
+OPTFLAGS  = -O3
+LIBS      = -qmkl  # Use Intel MKL
